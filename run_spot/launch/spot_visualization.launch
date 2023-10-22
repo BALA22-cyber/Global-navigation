@@ -1,0 +1,7 @@
+<launch>
+  <!-- Launch the spot_walk_turn_stop node -->
+  <node name="spot_walk_turn_stop" pkg="run_spot" type="spot_control.py" output="screen" />
+
+  <!-- Launch RViz with a specific configuration -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find run_spot)/rviz/spot_visualization.rviz" required="true" />
+</launch>

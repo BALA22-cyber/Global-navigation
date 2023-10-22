@@ -1,0 +1,5 @@
+catkin_pkg
+rospkg
+rospy
+gym
+easydict
