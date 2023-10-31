@@ -9,11 +9,16 @@ import numpy as np
 from ultralytics import YOLO
 import torch
 from sensor_msgs.msg import Image  # Updated from CompressedImage to Image
+import roslaunch  # Import roslaunch API
 
 # Global flags
 crosswalk_detected = False
 motion_detected = False
-
+def start_realsense_driver():
+    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+    roslaunch.configure_logging(uuid)
+    launch = roslaunch.parent.ROSLaunchParent(uuid, ["realsense2_camera", "rs_camera.launch"])
+    launch.start()
 # Callback for processing the image data and detection
 def image_callback(data):
     global crosswalk_detected, motion_detected
@@ -143,9 +148,12 @@ def navigate_husky(pub):
     pub.publish(stop_cmd)
 
 def main():
+    start_realsense_driver()  # Start the RealSense driver
+
     rospy.init_node('husky_navigator', anonymous=True)
     pub = rospy.Publisher('/husky_velocity_controller/cmd_vel', Twist, queue_size=10)
-    rospy.Subscriber('/camera/color/image_raw', Image, image_callback)  # Changed topic name and message type.
+    
+    rospy.Subscriber('/camera/color/image_raw', Image, image_callback)
     
     try:
         navigate_husky(pub)
