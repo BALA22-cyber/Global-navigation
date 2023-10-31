@@ -1,46 +1,62 @@
 #!/usr/bin/env python3
+
 import rospy
-from geometry_msgs.msg import Twist  # This message type might vary based on the spot_ros implementation
-import time
+from geometry_msgs.msg import Twist
+def move_husky():
+    rospy.init_node('husky_mover', anonymous=True)
+    
+    rospy.loginfo("Starting Husky movement...")  # Moved inside the function
+    
+    pub = rospy.Publisher('/husky_velocity_controller/cmd_vel', Twist, queue_size=10)
+    rate = rospy.Rate(10)  # 10Hz
 
-def spot_walk_turn_stop():
-    # Initialize a new ROS node
-    rospy.init_node('spot_walk_turn_stop', anonymous=True)
+    # Ensure there are subscribers
+    while pub.get_num_connections() == 0 and not rospy.is_shutdown():
+       rospy.loginfo("Waiting for subscribers...")
+       rospy.sleep(1)
+    
+    move_cmd = Twist()
 
-    pub = rospy.Publisher('/spot/command', Twist, queue_size=10)
+    # Move forward 1 meter
+    move_cmd.linear.x = 0.5 
+    move_cmd.angular.z = 0.0
+    for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+        pub.publish(move_cmd)
+        rate.sleep()
 
-    # Set the rate of publishing
-    rate = rospy.Rate(10)  # 10 Hz
-
-    walk_msg = Twist()
-    walk_msg.linear.x = 0.5 
-    turn_msg = Twist()
-    turn_msg.angular.z = 0.5  
-    stop_msg = Twist()  
+    # Stop the Husky
+    move_cmd.linear.x = 0.0
+    pub.publish(move_cmd)
     rospy.sleep(1)
 
-    #Walk
-    walk_duration = 1  
-    start_time = time.time()
-    while time.time() - start_time < walk_duration:
-        pub.publish(walk_msg)
-        rate.sleep()
-    
-    #Turn Left
-    turn_duration = 1  
-    start_time = time.time()
-    while time.time() - start_time < turn_duration:
-        pub.publish(turn_msg)
+    # Turn left by 90 degrees
+    move_cmd.angular.z = 1.5708  # π/2 radian/second
+    for _ in range(10):  # Assuming 1 rad/s speed for π/2 radian turn and 10Hz publishing rate
+        pub.publish(move_cmd)
         rate.sleep()
 
-    # Stop
-    pub.publish(stop_msg)
+    # Stop rotation
+    move_cmd.angular.z = 0.0
+    pub.publish(move_cmd)
+    rospy.sleep(1)
 
-    # Spin until ctrl + c
-    rospy.spin()
+    # Move forward again by 1 meter
+    move_cmd.linear.x = 0.5
+    for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+        pub.publish(move_cmd)
+        rate.sleep()
+
+    # Stop the Husky at the end
+    move_cmd.linear.x = 0.0
+    pub.publish(move_cmd)
 
 if __name__ == '__main__':
+    # rospy.loginfo("Moving Husky forward...")
+
     try:
-        spot_walk_turn_stop()
+        move_husky()
     except rospy.ROSInterruptException:
+        # rospy.loginfo("Not Moving Husky forward...")
         pass
+
+

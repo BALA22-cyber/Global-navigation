@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import rospy
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import CompressedImage
@@ -7,77 +8,11 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import torch
-from sensor_msgs.msg import Image
-import rosbag
-import threading
-import queue
-import time
+from sensor_msgs.msg import Image  # Updated from CompressedImage to Image
 
-# Initialize global variables
+# Global flags
 crosswalk_detected = False
 motion_detected = False
-
-
-# Global variables to store the previous frames and objects
-previous_frames = []
-previous_objects = []
-
-# Number of frames to use for moving average
-moving_average_frames = 10
-motion_threshold = 1000  # Adjust this threshold as needed
-
-def object_in_motion(current_frame, current_objects):
-    global previous_frames, previous_objects
-
-    if len(previous_frames) < moving_average_frames:
-        previous_frames.append(current_frame)
-        previous_objects.append(current_objects)
-        return
-
-    # Calculate the absolute difference between the current frame and the oldest frame in the moving average
-    frame_diff = cv2.absdiff(current_frame, previous_frames[0])
-
-    # Define a threshold for motion detection
-    frame_diff_gray = cv2.cvtColor(frame_diff, cv2.COLOR_BGR2GRAY)
-
-    # Apply a binary threshold to detect motion
-    _, motion_mask = cv2.threshold(frame_diff_gray, 30, 255, cv2.THRESH_BINARY)
-
-    # Count the number of non-zero pixels in the motion mask
-    motion_pixel_count = np.count_nonzero(motion_mask)
-
-    # If there is motion, set the flag to True
-    if motion_pixel_count > motion_threshold:
-        motion_detected = True
-    else:
-        motion_detected = False
-
-    # Update the previous frames and objects by maintaining a moving average
-    previous_frames.append(current_frame)
-    previous_objects.append(current_objects)
-    previous_frames.pop(0)
-    previous_objects.pop(0)
-
-    return motion_detected
-
-
-
-
-# Function to command Spot to perform actions
-def command_spot(pub, action):
-    rate = rospy.Rate(10)  # 10 Hz
-    msg = Twist()
-
-    if action == 'walk':
-        msg.linear.x = 0.5  # Speed value
-    elif action == 'stop':
-        # No values to be set, Twist() initializes to 0
-        pass
-    elif action == 'turn':
-        msg.angular.z = 0.5  # Turn speed value
-
-    pub.publish(msg)
-    rate.sleep()
 
 # Callback for processing the image data and detection
 def image_callback(data):
@@ -155,37 +90,65 @@ def image_callback(data):
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
-
-
-
-def navigate_spot(pub):
+def navigate_husky(pub):
     global crosswalk_detected, motion_detected
+    rate = rospy.Rate(10)  # 10Hz
 
-    while not rospy.is_shutdown():
+    move_cmd = Twist()
+    move_cmd.linear.x = 1  # speed for Husky
+    for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+        pub.publish(move_cmd)
+        # rate.sleep()
+
+    start_time = rospy.get_time()
+    while rospy.get_time() - start_time < 10:  # Assuming Husky covers 5 meters in 10 seconds at 0.5 m/s speed.
+        rospy.sleep(0.1)
         if crosswalk_detected:
-            if motion_detected == False:
-                # If the path is clear, walk forward or cross the crosswalk
-                command_spot(pub, 'walk')
-            else:
-                # If vehicles are moving, Spot should stop and wait
-                command_spot(pub, 'stop')
-        else:
-            # If no crosswalk is detected, Spot can turn or search for a crosswalk
-            command_spot(pub, 'turn')  # or 'walk', or any other logic you decide on
+            stop_cmd = Twist()
+            for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+                pub.publish(move_cmd)
+                rate.sleep(1)
+            
+            orient_cmd = Twist()
+            orient_cmd.angular.z = 0.5  
+            for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+                pub.publish(orient_cmd)
+                rate.sleep(1)
+            
+            stop_cmd = Twist()
+            for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+                pub.publish(stop_cmd)
+                rate.sleep(1)
 
-        rospy.sleep(1)  # Sleep for a short duration before the next iteration
+            while motion_detected:  
+                rospy.loginfo("Waiting for vehicles to stop...")
+                rospy.sleep(1)
+
+            cross_cmd = Twist()
+            cross_cmd.linear.x = 0.5
+            for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+                pub.publish(cross_cmd)
+                rate.sleep(5)
+
+            crosswalk_detected = False  
+            return  
+
+    turn_cmd = Twist()
+    turn_cmd.angular.z = -0.5  
+    for _ in range(10):  # Assuming 1 m/s speed and 10Hz publishing rate
+        pub.publish(turn_cmd)
+        rospy.sleep(2) 
+
+    stop_cmd = Twist()
+    pub.publish(stop_cmd)
 
 def main():
-    rospy.init_node('spot_navigator', anonymous=True)
-
-    # Publisher for sending commands to Spot
-    pub = rospy.Publisher('/spot/command', Twist, queue_size=10)
-
-    # Subscriber for receiving the compressed images
-    rospy.Subscriber('/camera/rgb/image_raw/compressed', CompressedImage, image_callback)
-
+    rospy.init_node('husky_navigator', anonymous=True)
+    pub = rospy.Publisher('/husky_velocity_controller/cmd_vel', Twist, queue_size=10)
+    rospy.Subscriber('/camera/color/image_raw', Image, image_callback)  # Changed topic name and message type.
+    
     try:
-        navigate_spot(pub)
+        navigate_husky(pub)
     except rospy.ROSInterruptException:
         pass
 
