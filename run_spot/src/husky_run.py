@@ -14,15 +14,15 @@ import roslaunch  # Import roslaunch API
 # Global flags
 crosswalk_detected = False
 motion_detected = False
-def start_realsense_driver():
-    uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
-    roslaunch.configure_logging(uuid)
-    launch = roslaunch.parent.ROSLaunchParent(uuid, ["realsense2_camera", "rs_camera.launch"])
-    launch.start()
+# def start_realsense_driver():
+#     uuid = roslaunch.rlutil.get_or_generate_uuid(None, False)
+#     roslaunch.configure_logging(uuid)
+#     launch = roslaunch.parent.ROSLaunchParent(uuid, ["realsense2_camera", "rs_camera.launch"])
+#     launch.start()
 # Callback for processing the image data and detection
 def image_callback(data):
     global crosswalk_detected, motion_detected
-    publisher = rospy.Publisher('image_from_rosbag', Image, queue_size=10)
+    publisher = rospy.Publisher('processed_camera_image', Image, queue_size=10)
 
     bridge = CvBridge()
     model = YOLO("models/yolov8m.pt")
@@ -148,7 +148,7 @@ def navigate_husky(pub):
     pub.publish(stop_cmd)
 
 def main():
-    start_realsense_driver()  # Start the RealSense driver
+    # start_realsense_driver()  # Start the RealSense driver
 
     rospy.init_node('husky_navigator', anonymous=True)
     pub = rospy.Publisher('/husky_velocity_controller/cmd_vel', Twist, queue_size=10)
