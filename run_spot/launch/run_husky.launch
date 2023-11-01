@@ -1,10 +1,9 @@
 <launch>
-    <!-- Launch the RealSense driver -->
-    <include file="$(find realsense2_camera)/launch/rs_camera.launch"/>
-
     <!-- Launch your custom Python node -->
-    <node pkg="run_spot" type="husky_tun.py" name="husky_navigator" output="screen">
+    <node pkg="run_spot" type="husky_run.py" name="husky_navigator" output="screen">
         <!-- Any params you want to set -->
     </node>
-</launch>
 
+    <!-- Launch the RealSense driver -->
+    <!-- <include file="$(find realsense2_camera)/launch/rs_camera.launch"/> -->
+</launch>
